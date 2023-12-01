@@ -1,0 +1,191 @@
+Part1:
+
+hdfs dfs -mkdir -p /user/khushboouser1/rawdata/airline/flights
+
+hdfs dfs -mkdir -p /user/khushboouser1/rawdata/airline/planeinfo
+
+hdfs dfs -mkdir -p /user/khushboouser1/rawdata/airline/airport
+
+hdfs dfs -mkdir -p /user/khushboouser1/rawdata/airline/carriers
+
+CREATE DATABASE airline_db_1;
+
+
+USE airline_db_1;
+
+-- Create the external table Airports_stg
+CREATE EXTERNAL TABLE Airports_stg (
+    IATA STRING,
+    Name STRING,
+    City STRING,
+    State STRING,
+    Country STRING,
+    Lat DECIMAL(9, 6),
+    Long DECIMAL(9, 6)
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/user/khushboouser1/rawdata/airline/airports'
+tblproperties(
+"skip.header.line.count"="1"
+);
+
+CREATE EXTERNAL TABLE Carrier_stg (
+    Code STRING,
+    Description STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/user/khushboouser1/rawdata/airline/carriers'
+tblproperties(
+"skip.header.line.count"="1"
+);
+
+CREATE EXTERNAL TABLE PlaneInfo_stg (
+    tailNum STRING,
+    type STRING,
+    manufacturer STRING,
+    issue_date STRING,
+    model STRING,
+    status STRING,
+    aircraft_type STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/user/khushboouser1/rawdata/airline/planeinfo'
+tblproperties(
+"skip.header.line.count"="1"
+);
+
+
+-- Create the database if it doesn't exist
+CREATE DATABASE IF NOT EXISTS airline_db;
+
+-- Use the airline_db database
+USE airline_db;
+
+-- Create the external table Flights_stg
+CREATE EXTERNAL TABLE Flights_stg (
+    Year INT,
+    Month INT,
+    DayofMonth INT,
+    DayOfWeek INT,
+    DepTime INT,
+    CRSDepTime INT,
+    ArrTime INT,
+    CRSArrTime INT,
+    UniqueCarrier STRING,
+    FlightNum STRING,
+    TailNum STRING,
+    ActualElapsedTime INT,
+    CRSElapsedTime INT,
+    AirTime INT,
+    ArrDelay INT,
+    DepDelay INT,
+    Origin STRING,
+    Dest STRING,
+    Distance INT,
+    TaxiIn STRING,
+    TaxiOut STRING,
+    Cancelled STRING,
+    CancellationCode STRING,
+    Diverted STRING,
+    CarrierDelay INT,
+    WeatherDelay INT,
+    NASDelay INT,
+    SecurityDelay INT,
+    LateAircraftDelay INT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/user/khushboouser1/rawdata/airline/flights'
+tblproperties(
+"skip.header.line.count"="1"
+);
+
+LOAD DATA LOCAL INPATH 'AirlinesOntimeAnalysis/airports.csv' OVERWRITE INTO TABLE Airports_stg;
+
+LOAD DATA LOCAL INPATH 'AirlinesOntimeAnalysis/carriers.csv' OVERWRITE INTO TABLE Carrier_stg;
+
+LOAD DATA LOCAL INPATH 'AirlinesOntimeAnalysis/plane-data.csv' OVERWRITE INTO TABLE PlaneInfo_stg;
+
+LOAD DATA LOCAL INPATH 'AirlinesOntimeAnalysis/2003.csv' OVERWRITE INTO TABLE Flights_stg;
+LOAD DATA LOCAL INPATH 'AirlinesOntimeAnalysis/2004.csv' OVERWRITE INTO TABLE Flights_stg;
+LOAD DATA LOCAL INPATH 'AirlinesOntimeAnalysis/2005.csv' OVERWRITE INTO TABLE Flights_stg;
+
+
+
+
+Q1.
+INSERT OVERWRITE DIRECTORY '/user/khushboouser1/Flight_delay_analysis'
+SELECT
+    Month,
+    AVG(ArrDelay) AS avg_arrival_delay,
+    AVG(DepDelay) AS avg_departure_delay
+FROM Flights_stg
+WHERE Year = 2004
+GROUP BY Month
+ORDER BY Month;
+
+hdfs dfs -cat /user/khushboouser1/Flight_delay_analysis/000000_0 
+
+hdfs dfs -ls /user/khushboouser1/Flight_delay_analysis
+
+
+
+Part2
+-- Create an external Parquet table 
+CREATE EXTERNAL TABLE flights_pq (
+    Year INT,
+    Month INT,
+    DayofMonth INT,
+    DayOfWeek INT,
+    DepTime INT,
+    CRSDepTime INT,
+    ArrTime INT,
+    CRSArrTime INT,
+    UniqueCarrier STRING,
+    FlightNum STRING,
+    TailNum STRING,
+    ActualElapsedTime INT,
+    CRSElapsedTime INT,
+    AirTime INT,
+    ArrDelay INT,
+    DepDelay INT,
+    Origin STRING,
+    Dest STRING,
+    Distance INT,
+    TaxiIn STRING,
+    TaxiOut STRING,
+    Cancelled STRING,
+    CancellationCode STRING,
+    Diverted STRING,
+    CarrierDelay INT,
+    WeatherDelay INT,
+    NASDelay INT,
+    SecurityDelay INT,
+    LateAircraftDelay INT
+)
+STORED AS PARQUET
+LOCATION '/user/khushboouser1/output/airline/pq_flights';
+
+
+INSERT OVERWRITE TABLE flights_pq
+SELECT
+    *
+FROM Flights_stg;
+
+
+Quety-
+SELECT
+    Month,
+    AVG(ArrDelay) AS avg_arrival_delay,
+    AVG(DepDelay) AS avg_departure_delay
+FROM flights_pq
+WHERE Year = 2004
+GROUP BY Month
+ORDER BY Month;
